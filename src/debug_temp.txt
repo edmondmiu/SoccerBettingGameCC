@@ -1,0 +1,12 @@
+DEBUGGING THE BETTING ISSUE:
+
+The problem is that StickyBettingDrawer receives `addToBetslip` function from Match component, but this function only adds to the betslip array - it doesn't place bets.
+
+The Match component has `handleAddToBetslip` function which actually places bets, but StickyBettingDrawer is getting `addToBetslip` instead.
+
+I need to find where StickyBettingDrawer is rendered in Match.tsx and change:
+  onAddToBetslip={addToBetslip}
+to:
+  onAddToBetslip={handleAddToBetslip}
+
+This will make full-match betting work properly by directly placing bets instead of adding to betslip.
