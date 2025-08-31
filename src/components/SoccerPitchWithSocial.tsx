@@ -91,17 +91,28 @@ export const SoccerPitchWithSocial: React.FC<SoccerPitchWithSocialProps> = ({
     };
   }, []);
 
-  const sendEmoji = useCallback((emoji: string, isOwn: boolean = true) => {
-    // Get spawn position from button location
-    const buttonSide = Math.random() > 0.5 ? 'left' : 'right';
-    const position = getEmojiButtonPosition(buttonSide);
-    
-    // Add some randomness around the button position
-    const randomOffset = 30;
-    const spawnPosition = {
-      x: position.x + (Math.random() - 0.5) * randomOffset,
-      y: position.y + (Math.random() - 0.5) * randomOffset
-    };
+  const sendEmoji = useCallback((emoji: string, isOwn: boolean = true, originEl?: HTMLElement | null) => {
+    // Prefer spawning from the exact button the user clicked
+    let spawnPosition: { x: number; y: number } | null = null;
+    const el = originEl || buttonRefs.current[emoji] || null;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      spawnPosition = {
+        x: rect.left + rect.width / 2 + window.scrollX,
+        y: rect.top + rect.height / 2 + window.scrollY,
+      };
+    }
+
+    if (!spawnPosition) {
+      // Fallback: approximate side button position
+      const buttonSide = Math.random() > 0.5 ? 'left' : 'right';
+      const position = getEmojiButtonPosition(buttonSide);
+      const randomOffset = 30;
+      spawnPosition = {
+        x: position.x + (Math.random() - 0.5) * randomOffset,
+        y: position.y + (Math.random() - 0.5) * randomOffset,
+      };
+    }
 
     const newEmoji: FloatingEmojiData = {
       id: `${Date.now()}-${Math.random()}`,
@@ -137,7 +148,7 @@ export const SoccerPitchWithSocial: React.FC<SoccerPitchWithSocialProps> = ({
     setIsHolding(prev => ({ ...prev, [emoji]: true }));
     
     intervalRefs.current[emoji] = setInterval(() => {
-      sendEmoji(emoji);
+      sendEmoji(emoji, true, buttonRefs.current[emoji]);
     }, 200);
   }, [sendEmoji]);
 
@@ -151,12 +162,12 @@ export const SoccerPitchWithSocial: React.FC<SoccerPitchWithSocialProps> = ({
   }, []);
 
   // Touch event handlers
-  const handleTouchStart = useCallback((emoji: string) => (e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((emoji: string) => (e: React.TouchEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setPressStates(prev => ({ ...prev, [emoji]: true }));
     touchStartTime.current[emoji] = Date.now();
     
-    sendEmoji(emoji);
+    sendEmoji(emoji, true, e.currentTarget);
     
     setTimeout(() => {
       if (touchStartTime.current[emoji] && Date.now() - touchStartTime.current[emoji] >= 290) {
@@ -172,10 +183,10 @@ export const SoccerPitchWithSocial: React.FC<SoccerPitchWithSocialProps> = ({
   }, [stopHoldEffect]);
 
   // Mouse event handlers for desktop
-  const handleMouseDown = useCallback((emoji: string) => (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((emoji: string) => (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setPressStates(prev => ({ ...prev, [emoji]: true }));
-    sendEmoji(emoji);
+    sendEmoji(emoji, true, e.currentTarget);
     
     setTimeout(() => {
       if (pressStates[emoji]) {
@@ -281,6 +292,7 @@ export const SoccerPitchWithSocial: React.FC<SoccerPitchWithSocialProps> = ({
       {/* Soccer Pitch */}
       <div 
         ref={pitchRef}
+        data-testid="soccer-pitch"
         className="relative w-full h-52 sm:h-60 md:h-72 bg-gradient-to-br from-green-600 to-green-700 overflow-hidden rounded-lg border border-green-400/30"
       >
         {/* Field markings */}

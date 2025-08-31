@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -39,28 +38,41 @@ const QUICK_PHRASES = [
   "Ouch! 😬"
 ];
 
-export function QuickChatSystem({ 
-  isVisible, 
+export function QuickChatSystem({
+  isVisible,
   onChatToggle,
   otherPlayerMessages = []
 }: QuickChatSystemProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<FloatingMessage[]>([]);
-  const [buttonRef, setButtonRef] = useState<HTMLButtonElement | null>(null);
 
-  const generateRandomPosition = useCallback(() => {
+  const generateSpawnPosition = useCallback(() => {
+    // Prefer spawning from the soccer pitch if present
+    if (typeof document !== 'undefined') {
+      const pitch = document.querySelector('[data-testid="soccer-pitch"]') as HTMLElement | null;
+      if (pitch) {
+        const rect = pitch.getBoundingClientRect();
+        // Random x within the pitch with a small inset so bubbles start inside the grass
+        const inset = 12;
+        const x = rect.left + inset + Math.random() * Math.max(1, rect.width - inset * 2);
+        // Start near the lower third of the pitch and float upward
+        const y = rect.top + rect.height * (0.66 + Math.random() * 0.25);
+        return { x, y };
+      }
+    }
+
+    // Fallback: viewport-based spawn
     const padding = 80;
     const maxWidth = typeof window !== 'undefined' ? window.innerWidth - padding * 2 : 300;
     const maxHeight = typeof window !== 'undefined' ? window.innerHeight - padding * 2 : 600;
-    
     return {
       x: padding + Math.random() * maxWidth,
-      y: padding + Math.random() * maxHeight * 0.5
+      y: padding + Math.random() * maxHeight * 0.5,
     };
   }, []);
 
   const sendMessage = useCallback((message: string, isOwn: boolean = true, playerName?: string) => {
-    const position = generateRandomPosition();
+    const position = generateSpawnPosition();
     const messageId = `${Date.now()}-${Math.random()}`;
 
     const floatingMessage: FloatingMessage = {
@@ -83,15 +95,16 @@ export function QuickChatSystem({
     if (isOwn) {
       setIsMenuOpen(false);
     }
-  }, [generateRandomPosition]);
+  }, [generateSpawnPosition]);
 
   const handleFloatingMessageComplete = useCallback((id: string) => {
     setFloatingMessages(prev => prev.filter(msg => msg.id !== id));
   }, []);
 
   const handleChatButtonClick = useCallback(() => {
-    setIsMenuOpen(!isMenuOpen);
-  }, [isMenuOpen]);
+    setIsMenuOpen((open) => !open);
+    if (onChatToggle) onChatToggle();
+  }, [onChatToggle]);
 
   const handleMessageSelect = useCallback((message: string) => {
     sendMessage(message, true);
@@ -114,67 +127,17 @@ export function QuickChatSystem({
     }
   }, [otherPlayerMessages, sendMessage, floatingMessages]);
 
-  // Debug logging
-  console.log('QuickChatSystem render:', { isVisible, isMenuOpen, floatingMessages: floatingMessages.length });
-  
-  // Inject unmissable CSS for debugging
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const style = document.createElement('style');
-      style.id = 'nuclear-chat-debug';
-      style.innerHTML = `
-        @keyframes nuclear-pulse {
-          0% { 
-            transform: scale(1) !important;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
-          }
-          50% { 
-            transform: scale(1.2) !important;
-            box-shadow: 0 0 40px rgba(255, 0, 0, 1) !important;
-          }
-          100% { 
-            transform: scale(1) !important;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
-          }
-        }
-        .nuclear-chat-button {
-          animation: nuclear-pulse 1s infinite !important;
-        }
-      `;
-      document.head.appendChild(style);
-      
-      return () => {
-        const existingStyle = document.getElementById('nuclear-chat-debug');
-        if (existingStyle) {
-          existingStyle.remove();
-        }
-      };
-    }
-  }, []);
-  
   if (!isVisible) {
-    console.log('QuickChatSystem: Not visible, returning null');
     return null;
   }
-
-  // Get button position for menu positioning
-  const getMenuPosition = () => {
-    if (!buttonRef) return { x: 0, y: 0 };
-    
-    const rect = buttonRef.getBoundingClientRect();
-    return {
-      x: rect.right - 240, // Position menu to the left of button
-      y: rect.bottom + 8   // Position below button with small gap
-    };
-  };
-
-  const menuPosition = getMenuPosition();
-
-  // Create portal content
-  const portalContent = (
+  return (
     <>
-      {/* Floating messages container */}
-      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 99997 }}>
+      {/* Floating messages (viewport level) */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        // Ensure bubbles render above cards/drawers
+        style={{ zIndex: 12000 }}
+      >
         <AnimatePresence>
           {floatingMessages.map((msg) => (
             <FloatingChatBubble
@@ -186,151 +149,60 @@ export function QuickChatSystem({
         </AnimatePresence>
       </div>
 
-      {/* NUCLEAR CHAT BUTTON - Rendered directly to body via portal */}
-      <button
-        ref={setButtonRef}
-        onClick={handleChatButtonClick}
-        className="nuclear-chat-button"
+      {/* Floating chat button - top right to avoid bottom overlays */}
+      <div
+        // Fixed with safe-area padding and high z-index
         style={{
-          position: 'fixed !important',
-          top: '80px !important',
-          right: '16px !important',
-          width: '120px !important',
-          height: '120px !important',
-          backgroundColor: '#ff0000 !important',
-          border: '10px solid #ffff00 !important',
-          borderRadius: '50% !important',
-          zIndex: '999999 !important',
-          display: 'flex !important',
-          flexDirection: 'column !important',
-          alignItems: 'center !important',
-          justifyContent: 'center !important',
-          cursor: 'pointer !important',
-          boxShadow: '0 0 20px rgba(255, 0, 0, 0.8) !important',
-          opacity: '1 !important',
-          visibility: 'visible !important',
-          transform: 'none !important',
-          margin: '0 !important',
-          padding: '8px !important',
-          minWidth: '120px !important',
-          minHeight: '120px !important',
-          maxWidth: '120px !important',
-          maxHeight: '120px !important',
-          pointerEvents: 'auto !important',
-          overflow: 'visible !important',
-          contain: 'none !important',
-          isolation: 'auto !important',
-          fontFamily: 'system-ui !important',
-          fontSize: '10px !important',
-          fontWeight: 'bold !important',
-          textAlign: 'center !important',
-          color: '#ffffff !important',
+          position: 'fixed',
+          right: 'calc(env(safe-area-inset-right, 0px) + 20px)',
+          top: 'calc(env(safe-area-inset-top, 0px) + 76px)',
+          zIndex: 2147483000,
         }}
       >
-        <MessageCircle 
-          style={{ 
-            width: '40px', 
-            height: '40px', 
-            color: '#ffffff',
-            display: 'block',
-            opacity: '1 !important',
-            visibility: 'visible !important',
-            marginBottom: '4px',
-          }} 
-        />
-        <div style={{ 
-          color: '#ffffff !important', 
-          fontSize: '10px !important', 
-          fontWeight: 'bold !important',
-          textShadow: '1px 1px 1px rgba(0,0,0,0.8) !important',
-        }}>
-          CHAT
-        </div>
-      </button>
+        <button
+          data-testid="quick-chat-button"
+          onClick={handleChatButtonClick}
+          className="h-12 w-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg border border-white/10 flex items-center justify-center"
+          aria-label="Quick chat"
+        >
+          {isMenuOpen ? <X size={18} /> : <MessageCircle size={18} />}
+        </button>
 
-      {/* Spring-out message menu */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            className="fixed"
-            style={{
-              zIndex: 99999,
-              left: `${menuPosition.x}px`,
-              top: `${menuPosition.y}px`
-            }}
-            initial={{ 
-              scale: 0, 
-              opacity: 0, 
-              transformOrigin: 'top right'
-            }}
-            animate={{ 
-              scale: 1, 
-              opacity: 1,
-              transition: {
-                type: "spring",
-                stiffness: 300,
-                damping: 20,
-                duration: 0.3
-              }
-            }}
-            exit={{ 
-              scale: 0, 
-              opacity: 0,
-              transition: {
-                duration: 0.15
-              }
-            }}
-          >
-            <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl p-3 w-60">
-              {/* Quick phrase buttons */}
+        {/* Spring-out quick phrases menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              className="absolute top-14 right-0 bg-black/80 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl p-3"
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                width: 'min(240px, calc(100vw - 40px))',
+                maxWidth: 'calc(100vw - 40px)',
+                zIndex: 12010,
+              }}
+            >
               <div className="grid grid-cols-2 gap-2">
                 {QUICK_PHRASES.map((phrase, index) => (
                   <motion.button
                     key={phrase}
                     onClick={() => handleMessageSelect(phrase)}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors text-left touch-manipulation"
-                    style={{ minHeight: '36px' }}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ 
-                      opacity: 1, 
-                      y: 0,
-                      transition: { 
-                        delay: index * 0.03,
-                        duration: 0.2
-                      }
-                    }}
-                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors text-left touch-manipulation min-h-9"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0, transition: { delay: index * 0.03, duration: 0.15 } }}
+                    whileTap={{ scale: 0.97 }}
                   >
                     {phrase}
                   </motion.button>
                 ))}
               </div>
-            </div>
-            
-            {/* Menu pointer/arrow */}
-            <div className="absolute -top-2 right-6 w-4 h-4 bg-black/80 border border-white/20 transform rotate-45 border-b-0 border-r-0"></div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Overlay to close menu when clicking outside */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            className="fixed inset-0"
-            style={{ zIndex: 99998 }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsMenuOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
-
-  // Return portal content rendered directly to document.body
-  return typeof document !== 'undefined' ? createPortal(portalContent, document.body) : null;
 }
 
 // Floating chat bubble component (unchanged)
@@ -351,7 +223,6 @@ function FloatingChatBubble({ message, onComplete }: FloatingChatBubbleProps) {
   return (
     <motion.div
       className="fixed pointer-events-none select-none"
-      style={{ zIndex: 99997 }}
       initial={{
         x: message.x,
         y: message.y,
@@ -374,6 +245,7 @@ function FloatingChatBubble({ message, onComplete }: FloatingChatBubbleProps) {
           }
         }
       }}
+      style={{ zIndex: 12005 }}
     >
       <div className={`px-3 py-2 rounded-full max-w-48 ${
         message.isOwn 
