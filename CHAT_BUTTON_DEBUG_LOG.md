@@ -143,10 +143,50 @@
 
 ## **Current Status**
 
-- **Nuclear approach deployed**: Extreme visibility implementation
-- **Development server**: Running at http://localhost:3001/
-- **Build status**: ✅ Compiles successfully
-- **Waiting for**: User verification of nuclear button visibility
+- Previous "nuclear" approach did not resolve visibility in production UI.
+- Root cause identified: invalid inline CSS values with "!important" in React style objects were ignored by the browser, so critical properties like `position: fixed`, `z-index`, `top/right`, and sizing were never applied.
+- Final resolution implemented: removed portal + invalid inline styles and replaced with a simple, fixed-position floating chat button and menu using Tailwind classes and correct z-indexes.
+- Build status: ✅ Compiles successfully. Verified in match and lobby views.
+
+---
+
+## **Root Cause**
+
+React’s inline `style` object does not support `!important`. Values like `'fixed !important'` or `'999999 !important'` are invalid CSS values, so the browser drops the entire declaration. This meant the chat button had no fixed positioning, no explicit size, and no elevated z-index, leaving it either off-screen or underneath other UI layers.
+
+Additionally, using a portal was unnecessary here and complicated stacking context analysis; a fixed element with a sensible z-index on the app root works reliably.
+
+---
+
+## **Final Fix (2025-08-30)**
+
+1) Removed the portal and all debug CSS injection/`!important` usages.
+
+2) Implemented a small floating chat FAB anchored to the viewport:
+
+- File: `src/components/QuickChatSystem.tsx`
+- Placement: `fixed right-4 bottom-24 md:bottom-6 md:right-6 z-[90]`
+- Menu: spring-in panel rendered as an absolutely-positioned sibling (`bottom-14 right-0`) with `z-[90]`.
+- Floating messages: remain as `fixed` with `z-[80]` to appear above app content but below overlays related to the chat button.
+
+3) Kept existing quick phrases and floating bubbles, but simplified UI logic. No inline `!important`; only valid Tailwind classes and Motion transitions.
+
+---
+
+## **How To Verify**
+
+1. Start the dev server: `npm run dev`.
+2. From Lobby, join any match.
+3. Look bottom-right for the circular chat button (speech-bubble icon).
+4. Tap it to open the quick phrases menu; select a phrase to see a floating message.
+5. Ensure it remains visible above the Live Betting Feed and Sticky Betting Drawer.
+
+---
+
+## **Notes**
+
+- If additional overlays are added with higher z-index values, keep chat at `z-[90]` and floating messages at `z-[80]` or adjust accordingly.
+- If you prefer a right-side Sheet/Drawer instead of the compact grid, we can switch to `src/components/ui/sheet.tsx` easily.
 
 ---
 

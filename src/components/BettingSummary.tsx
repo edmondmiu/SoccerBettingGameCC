@@ -8,9 +8,11 @@ import { useCountingAnimation } from './utils/useCountingAnimation';
 
 interface BettingSummaryProps {
   activeBets: Bet[];
+  powerUpAvailable?: boolean;
+  onUsePowerUp?: (betId: string) => void;
 }
 
-export function BettingSummary({ activeBets }: BettingSummaryProps) {
+export function BettingSummary({ activeBets, powerUpAvailable = false, onUsePowerUp }: BettingSummaryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [previousBetCount, setPreviousBetCount] = useState(0);
   const [showPulse, setShowPulse] = useState(false);
@@ -76,11 +78,6 @@ export function BettingSummary({ activeBets }: BettingSummaryProps) {
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 text-sm flex-1">
-                  <div className="flex items-center gap-1">
-                    <Target size={14} className="text-green-400" />
-                    <span className="text-white">{animatedTotalBets}</span>
-                    <span className="text-gray-400">bets</span>
-                  </div>
                   <div className="flex items-center gap-1">
                     <DollarSign size={14} className="text-blue-400" />
                     <span className="text-white">${animatedTotalStaked.toLocaleString()}</span>
@@ -162,13 +159,23 @@ export function BettingSummary({ activeBets }: BettingSummaryProps) {
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex-1">
                           <div className="text-sm text-white mb-1">{bet.outcome}</div>
                           <div className="text-xs text-gray-400">
-                            ${bet.amount} @ {bet.odds} = ${(bet.amount * bet.odds * (bet.powerUpApplied ? 2 : 1)).toFixed(0)} potential
+                            ${bet.amount} @ {bet.odds} = {(bet.amount * bet.odds * (bet.powerUpApplied ? 2 : 1)).toFixed(0)} potential
                           </div>
                         </div>
+                        {/* Use Power-Up action on mobile summary */}
+                        {!bet.resolved && powerUpAvailable && !bet.powerUpApplied && onUsePowerUp && (
+                          <button
+                            onClick={() => onUsePowerUp(bet.id)}
+                            className="shrink-0 text-xs px-2 py-1 rounded-md border border-yellow-400/40 bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/25 transition-colors"
+                            aria-label="Use Power-Up"
+                          >
+                            2x
+                          </button>
+                        )}
                         
                         {bet.resolved && (
                           <div className="text-right">

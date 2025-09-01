@@ -18,6 +18,7 @@ interface HeaderProps {
 export function Header({ gameState, totalPlayersOnline = 0, showBackButton = false, onBackClick, onDebugActionBet, onDebugMatchSummary, updateGameState }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [animatedBalance, setAnimatedBalance] = useState(gameState.wallet);
+  const APP_VERSION = (import.meta as any)?.env?.VITE_APP_VERSION || '0.1.0';
 
   // Animate balance changes
   useEffect(() => {
@@ -104,7 +105,11 @@ export function Header({ gameState, totalPlayersOnline = 0, showBackButton = fal
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-slate-900"></div>
               </div>
               <div>
-                <h1 className="text-white font-bold text-lg tracking-tight">Next Goal</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-white font-bold text-lg tracking-tight">Next Goal</h1>
+                  {/* Inline version badge to guarantee visibility for verification */}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 border border-white/20">v{APP_VERSION}</span>
+                </div>
                 <div className="flex items-center gap-1 text-xs text-gray-400">
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
                   Live Betting
@@ -144,6 +149,12 @@ export function Header({ gameState, totalPlayersOnline = 0, showBackButton = fal
                 <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-xs px-2 py-1">
                   ${Math.round(animatedBalance).toLocaleString()}
                 </Badge>
+                {gameState.powerUp && (
+                  <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-400/30 text-xs px-2 py-1 flex items-center gap-1 animate-pulse">
+                    <Zap size={10} />
+                    x2
+                  </Badge>
+                )}
               </div>
 
               {/* Account Button */}
@@ -262,6 +273,9 @@ export function Header({ gameState, totalPlayersOnline = 0, showBackButton = fal
                   <LogOut size={16} className="mr-3" />
                   Sign Out
                 </Button>
+                <div className="mt-2 px-3 py-1 text-[11px] text-gray-400/90 border-t border-white/10">
+                  Version v{APP_VERSION}
+                </div>
               </div>
             </div>
           </div>

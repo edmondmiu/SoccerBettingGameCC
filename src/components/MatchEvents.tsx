@@ -172,7 +172,7 @@ export function MatchEvents({ events, currentTime, activeBets, simplified = fals
   // If simplified mode, render content directly without the nested collapsible
   if (simplified) {
     return (
-      <Card className="mt-2 backdrop-blur-sm bg-card/60 border-border/50">
+      <Card className="backdrop-blur-sm bg-card/60 border-border/50 rounded-t-none border-t-0">
         <CardContent className="px-4 py-4">
           <ScrollArea className="h-[300px] pr-4">
             {/* Past Events */}

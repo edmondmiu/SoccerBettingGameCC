@@ -333,6 +333,11 @@ export function StickyBettingDrawer({ gameState, onAddToBetslip, updateGameState
                 <div className="text-chart-4/90 text-sm mt-3 bg-chart-4/10 rounded-lg px-3 py-2 border border-chart-4/30">
                   Stake: <span className="font-bold text-chart-4">${formatCurrency(currentStake, true)}</span> • Odds: <span className="font-bold text-chart-4">{getSelectedOdds()}</span>
                 </div>
+                {gameState.powerUp && (
+                  <div className="mt-2 text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-400/30 rounded-md px-2 py-1 inline-block">
+                    Power-up ready: apply 2x from "Your Bets" after placing
+                  </div>
+                )}
               </div>
 
               {/* Place bet button */}

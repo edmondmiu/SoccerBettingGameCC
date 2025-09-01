@@ -29,6 +29,16 @@ export function ActionBettingModal({
   const [betAmount, setBetAmount] = useState(gameState.lastActionBetAmount.toString());
   const [showBetSlip, setShowBetSlip] = useState(false);
 
+  // Ensure consistent flow each time the modal opens
+  // Reset selection and step to force user to pick an option first
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedOption(null);
+      setShowBetSlip(false);
+      setBetAmount(gameState.lastActionBetAmount.toString());
+    }
+  }, [isOpen, event?.id, gameState.lastActionBetAmount]);
+
   // Don't render if event is null
   if (!event) return null;
 
@@ -231,11 +241,16 @@ export function ActionBettingModal({
                     <div className="flex items-center justify-between">
                       <span className="text-chart-4 font-bold text-lg">Potential Win</span>
                       <span className="text-foreground font-bold text-2xl bg-chart-4/90 text-white px-4 py-2 rounded-lg shadow-md">
-                        ${(parseFloat(betAmount || '0') * (selectedOption?.odds || 1)).toFixed(2)}
+                        {(parseFloat(betAmount || '0') * (selectedOption?.odds || 1) * (gameState.powerUp ? 2 : 1)).toFixed(2)}
                       </span>
                     </div>
                     <div className="text-chart-4/90 text-sm mt-3 bg-chart-4/10 rounded-lg px-3 py-2 border border-chart-4/30">
                       Stake: <span className="font-bold text-chart-4">${parseFloat(betAmount || '0').toFixed(2)}</span> • Odds: <span className="font-bold text-chart-4">{selectedOption?.odds}</span>
+                      {gameState.powerUp && (
+                        <>
+                          {' '}• <span className="font-bold text-chart-4">x2 Power‑Up</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

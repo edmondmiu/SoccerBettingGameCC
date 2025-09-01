@@ -832,6 +832,8 @@ export function Match({
         {/* Betting summary at the top */}
         <BettingSummary 
           activeBets={gameState.activeBets}
+          powerUpAvailable={!!gameState.powerUp}
+          onUsePowerUp={(betId) => usePowerUp(betId)}
         />
 
         {/* Match info card */}
@@ -879,7 +881,7 @@ export function Match({
         {/* Live Commentary section */}
         <Collapsible open={commentaryExpanded} onOpenChange={setCommentaryExpanded}>
           <CollapsibleTrigger asChild>
-            <Card className="cursor-pointer hover:bg-card/80 transition-colors backdrop-blur-md bg-card/60 border-border/50">
+            <Card className={`cursor-pointer hover:bg-card/80 transition-colors backdrop-blur-md bg-card/60 border-border/50 ${commentaryExpanded ? 'rounded-b-none border-b-0' : ''}`}>
               <CardContent className="p-4">
                 {commentaryExpanded ? (
                   <div className="flex items-center justify-between">
@@ -895,20 +897,15 @@ export function Match({
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      </div>
-                      <div className="text-muted-foreground">
-                        <ChevronRight size={16} />
-                      </div>
-                    </div>
-                    <div className="text-foreground text-sm leading-relaxed pl-4">
+                  <div className="flex items-start gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1.5 shrink-0"></div>
+                    <div className="flex-1 text-foreground text-sm leading-snug line-clamp-2">
                       {gameState.matchEvents.length > 0 
                         ? gameState.matchEvents[gameState.matchEvents.length - 1]?.description || "Match in progress..."
-                        : "Match starting soon..."
-                      }
+                        : "Match starting soon..."}
+                    </div>
+                    <div className="text-muted-foreground shrink-0 ml-2">
+                      <ChevronRight size={16} />
                     </div>
                   </div>
                 )}

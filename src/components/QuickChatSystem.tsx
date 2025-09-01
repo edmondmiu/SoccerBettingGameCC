@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, X } from 'lucide-react';
 
@@ -45,6 +45,11 @@ export function QuickChatSystem({
 }: QuickChatSystemProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floatingMessages, setFloatingMessages] = useState<FloatingMessage[]>([]);
+  const [anchorRect, setAnchorRect] = useState<{
+    left: number; top: number; right: number; bottom: number; width: number; height: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
 
   const generateSpawnPosition = useCallback(() => {
     // Prefer spawning from the soccer pitch if present
@@ -127,6 +132,94 @@ export function QuickChatSystem({
     }
   }, [otherPlayerMessages, sendMessage, floatingMessages]);
 
+  // Allow external toggle via a global custom event (for in-card chat button)
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const custom = ev as CustomEvent;
+      const rect = (custom && (custom as any).detail && (custom as any).detail.anchorRect) || null;
+      if (rect) {
+        setAnchorRect(rect);
+      }
+      setIsMenuOpen((open) => !open);
+      if (onChatToggle) onChatToggle();
+    };
+    // Type cast to any to avoid TS event map warnings for custom name
+    window.addEventListener('quickchat:toggle' as any, handler as any);
+    return () => window.removeEventListener('quickchat:toggle' as any, handler as any);
+  }, [onChatToggle]);
+
+  // Clamp menu within the viewport so it is fully visible
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const computePosition = () => {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
+      const padding = 12; // minimal viewport inset
+      const width = Math.min(240, vw - 40); // matches style width below
+      const height = menuRef.current?.offsetHeight || 200;
+
+      if (anchorRect) {
+        // Default to left of the anchor
+        let left = anchorRect.left - 4 - width;
+        // Clamp horizontally
+        left = Math.max(padding, Math.min(left, vw - padding - width));
+
+        // Center vertically on the anchor then clamp
+        let top = anchorRect.top + anchorRect.height / 2 - height / 2;
+        top = Math.max(padding, Math.min(top, vh - padding - height));
+
+        setMenuStyle({ left, top, right: 'auto', bottom: 'auto', transform: 'none' });
+      } else {
+        setMenuStyle({
+          right: 'calc(env(safe-area-inset-right, 0px) + 20px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          left: 'auto',
+          top: 'auto',
+          transform: 'none',
+        });
+      }
+    };
+
+    // Compute immediately and again on next frame to catch measured height
+    computePosition();
+    const raf = requestAnimationFrame(computePosition);
+
+    const onResize = () => computePosition();
+    window.addEventListener('resize', onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [isMenuOpen, anchorRect]);
+
+  // Close on outside click or Escape
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handlePointerDown = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      // Ignore clicks on the trigger button
+      if (target && target.closest && target.closest('[data-quickchat-trigger]')) {
+        return;
+      }
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMenuOpen]);
+
   if (!isVisible) {
     return null;
   }
@@ -149,58 +242,45 @@ export function QuickChatSystem({
         </AnimatePresence>
       </div>
 
-      {/* Floating chat button - top right to avoid bottom overlays */}
-      <div
-        // Fixed with safe-area padding and high z-index
-        style={{
-          position: 'fixed',
-          right: 'calc(env(safe-area-inset-right, 0px) + 20px)',
-          top: 'calc(env(safe-area-inset-top, 0px) + 76px)',
-          zIndex: 2147483000,
-        }}
-      >
-        <button
-          data-testid="quick-chat-button"
-          onClick={handleChatButtonClick}
-          className="h-12 w-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg border border-white/10 flex items-center justify-center"
-          aria-label="Quick chat"
-        >
-          {isMenuOpen ? <X size={18} /> : <MessageCircle size={18} />}
-        </button>
-
-        {/* Spring-out quick phrases menu */}
-        <AnimatePresence>
-          {isMenuOpen && (
-            <motion.div
-              className="absolute top-14 right-0 bg-black/80 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl p-3"
-              initial={{ opacity: 0, y: -8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.15 }}
-              style={{
-                width: 'min(240px, calc(100vw - 40px))',
-                maxWidth: 'calc(100vw - 40px)',
-                zIndex: 12010,
-              }}
-            >
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_PHRASES.map((phrase, index) => (
-                  <motion.button
-                    key={phrase}
-                    onClick={() => handleMessageSelect(phrase)}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors text-left touch-manipulation min-h-9"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0, transition: { delay: index * 0.03, duration: 0.15 } }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    {phrase}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* Quick chat menu anchored to last trigger (falls back to bottom-right) */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            ref={menuRef}
+            className="fixed bg-black/90 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl p-3"
+            initial={{ opacity: 0, y: 0, x: 10, scale: 0.96, transformOrigin: 'right center' } as any}
+            animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 0, x: 10, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'fixed',
+              ...menuStyle,
+              width: 'min(240px, calc(100vw - 40px))',
+              maxWidth: 'calc(100vw - 40px)',
+              zIndex: 2147483000,
+            }}
+          >
+            {/* Pointer connecting to chat icon */}
+            {anchorRect && (
+              <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rotate-45 bg-black/80 border-r border-b border-white/20" />
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {QUICK_PHRASES.map((phrase, index) => (
+                <motion.button
+                  key={phrase}
+                  onClick={() => handleMessageSelect(phrase)}
+                  className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors text-left touch-manipulation min-h-9"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0, transition: { delay: index * 0.03, duration: 0.15 } }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {phrase}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

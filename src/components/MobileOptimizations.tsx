@@ -66,6 +66,14 @@ export const mobileStyles = `
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Utility: line clamp to 2 lines (Tailwind-like) */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
   /* Ensure minimum touch targets */
   .touch-target {
     min-height: 44px;
